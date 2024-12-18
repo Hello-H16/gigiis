@@ -1,0 +1,1233 @@
+Lab 1
+
+#!/bin/ns
+
+
+
+# Create Simulator
+
+set ns [new Simulator]
+
+
+
+# Open Trace file and NAM file
+
+set ntrace [open out/out1.tr w]
+
+set namfile [open out/out1.nam w]
+
+
+
+$ns trace-all $ntrace
+
+$ns namtrace-all $namfile
+
+
+
+# Finish Procedure
+
+proc finish {} {
+
+ global ns ntrace namfile
+
+
+
+ # Dump all the trace data and close the files
+
+ $ns flush-trace
+
+ close $ntrace
+
+ close $namfile
+
+
+
+ # Show the number of packets dropped
+
+ exec printf "The number of packet drops is " &
+
+ exec grep -c "^d" out/out1.tr &
+
+ exec nam out/out1.nam &
+
+ exit 0
+
+}
+
+
+
+# Create 3 nodes
+
+set n0 [$ns node]
+
+set n1 [$ns node]
+
+set n2 [$ns node]
+
+
+
+# Label the nodes
+
+$n0 label "TCP Source"
+
+$n2 label "Sink"
+
+
+
+# Set the color
+
+$ns color 1 blue
+
+
+
+
+
+# Create Links between nodes
+
+# Modify the bandwidth to observe the variation in packet drop
+
+$ns duplex-link $n0 $n1 1Mb 10ms DropTail
+
+$ns duplex-link $n1 $n2 1Mb 10ms DropTail
+
+
+
+# Make the Link Orientation
+
+$ns duplex-link-op $n0 $n1 orient right
+
+$ns duplex-link-op $n1 $n2 orient right
+
+
+
+# Set Queue Size
+
+# Modify the queue length to observe the variation in packet drop
+
+$ns queue-limit $n0 $n1 10
+
+$ns queue-limit $n1 $n2 10
+
+
+
+# Set up a Transport layer connection
+
+set tcp0 [new Agent/TCP]
+
+set sink0 [new Agent/TCPSink]
+
+
+
+$ns attach-agent $n0 $tcp0
+
+$ns attach-agent $n2 $sink0
+
+$ns connect $tcp0 $sink0
+
+
+
+# Set up an Application layer Traffic
+
+set cbr0 [new Application/Traffic/CBR]
+
+
+
+$cbr0 set type_ CBR
+
+$cbr0 set packetSize_ 100
+
+$cbr0 set rate_ 1Mb
+
+$cbr0 set random_ false
+
+$cbr0 attach-agent $tcp0
+
+
+
+$tcp0 set class_ 1
+
+
+
+# Schedule Events
+
+$ns at 0 "$cbr0 start"
+
+$ns at 5 "finish"
+
+
+
+# Run the Simulation
+
+$ns run
+
+
+
+Lab 2
+
+#!/bin/ns
+
+
+
+set ns [new Simulator]
+
+set nf [open out/out2.nam w]
+
+set tf [open out/out2.tr w]
+
+
+
+$ns namtrace-all $nf
+
+$ns trace-all $tf
+
+
+
+for {set i 0} {$i < 6} {incr i} {
+
+ set n$i [$ns node]
+
+}
+
+
+
+$n4 shape box
+
+$ns duplex-link $n0 $n4 1005Mb 1ms DropTail
+
+$ns duplex-link $n1 $n4 50Mb 1ms DropTail
+
+$ns duplex-link $n2 $n4 2000Mb 1ms DropTail
+
+$ns duplex-link $n3 $n4 200Mb 1ms DropTail
+
+$ns duplex-link $n4 $n5 1Mb 1ms DropTail
+
+
+
+set p1 [new Agent/Ping]
+
+$ns attach-agent $n0 $p1
+
+$p1 set packetSize_ 50000
+
+$p1 set interval_ .0001
+
+
+
+set p2 [new Agent/Ping]
+
+$ns attach-agent $n1 $p2
+
+
+
+set p3 [new Agent/Ping]
+
+$ns attach-agent $n2 $p3
+
+$p3 set packetSize_ 30000
+
+$p3 set interval_ .00001
+
+
+
+set p4 [new Agent/Ping]
+
+$ns attach-agent $n3 $p4
+
+
+
+set p5 [new Agent/Ping]
+
+$ns attach-agent $n5 $p5
+
+$ns queue-limit $n0 $n4 5
+
+$ns queue-limit $n2 $n4 3
+
+$ns queue-limit $n4 $n5 2
+
+
+
+Agent/Ping instproc recv {from rtt} {
+
+ $self instvar node_
+
+ puts "node [$node_ id] received answer from $from with round trip time $rtt ms"
+
+}
+
+
+
+$ns connect $p1 $p5
+
+$ns connect $p3 $p4
+
+
+
+proc finish { } {
+
+ global ns nf tf
+
+ $ns flush-trace
+
+ close $nf
+
+ close $tf
+
+ exec awk -f awk/out2.awk out/out2.tr &
+
+ exec nam out/out2.nam &
+
+ exit 0
+
+}
+
+
+
+foreach i [list $p1 $p3] {
+
+ for {set j 1} {$j < 30} {incr j} {
+
+ $ns at [format "%1.1f" [expr {$j * .1}]] "$i send"
+
+ }
+
+}
+
+
+
+$ns at 3 "finish"
+
+$ns run
+
+
+
+Lab 3
+
+#!/bin/ns
+
+
+
+set ns [new Simulator]
+
+set tf [open out/out3.tr w]
+
+set nf [open out/out3.nam w]
+
+
+
+$ns trace-all $tf
+
+$ns namtrace-all $nf
+
+
+
+set n0 [$ns node]
+
+set n1 [$ns node]
+
+$n0 color "magenta"
+
+$n0 label "src1"
+
+
+
+set n2 [$ns node]
+
+$n2 color "magenta"
+
+$n2 label "src2"
+
+
+
+set n3 [$ns node]
+
+set n4 [$ns node]
+
+$n3 color "blue"
+
+$n3 label "dest2"
+
+
+
+set n5 [$ns node]
+
+$n5 color "blue"
+
+$n5 label "dest1"
+
+
+
+$ns make-lan "$n0 $n1 $n2 $n3 $n4" 100Mb 100ms LL Queue/DropTail Mac/802_3
+
+$ns duplex-link $n4 $n5 1Mb 1ms DropTail
+
+
+
+set tcp0 [new Agent/TCP]
+
+$ns attach-agent $n0 $tcp0
+
+
+
+set ftp0 [new Application/FTP]
+
+$ftp0 attach-agent $tcp0
+
+$ftp0 set packetSize_ 500
+
+$ftp0 set interval_ 0.0001
+
+
+
+set sink5 [new Agent/TCPSink]
+
+$ns attach-agent $n5 $sink5
+
+$ns connect $tcp0 $sink5
+
+
+
+set tcp2 [new Agent/TCP]
+
+$ns attach-agent $n2 $tcp2
+
+
+
+set ftp2 [new Application/FTP]
+
+$ftp2 attach-agent $tcp2
+
+$ftp2 set packetSize_ 600
+
+$ftp2 set interval_ 0.001
+
+
+
+set sink3 [new Agent/TCPSink]
+
+$ns attach-agent $n3 $sink3
+
+$ns connect $tcp2 $sink3
+
+
+
+set file1 [open out/out3.1.tr w]
+
+$tcp0 attach $file1
+
+
+
+set file2 [open out/out3.2.tr w]
+
+$tcp2 attach $file2
+
+
+
+$tcp0 trace cwnd_
+
+$tcp2 trace cwnd_
+
+
+
+proc finish {} {
+
+ global ns nf tf
+
+ $ns flush-trace
+
+ close $tf
+
+ close $nf
+
+ exec awk -f awk/out3.awk out/out3.1.tr > out/out3.1.dat &
+
+ exec awk -f awk/out3.awk out/out3.2.tr > out/out3.2.dat &
+
+ exec xgraph -color red out/out3.1.dat -color green out/out3.2.dat &
+
+ exec nam out/out3.nam &
+
+ exit 0
+
+}
+
+
+
+$ns at .1 "$ftp0 start"
+
+$ns at 5 "$ftp0 stop"
+
+$ns at 7 "$ftp0 start"
+
+$ns at .2 "$ftp2 start"
+
+$ns at 8 "$ftp2 stop"
+
+$ns at 14 "$ftp0 stop"
+
+$ns at 10 "$ftp2 start"
+
+$ns at 15 "$ftp2 stop"
+
+$ns at 16 "finish"
+
+
+
+$ns run
+
+
+
+Lab 6
+
+import java.util.Scanner;
+
+
+
+public class BellmanFord {
+
+ private int D[];
+
+ private int num_ver;
+
+ public static final int MAX_VALUE = 999;
+
+
+
+ public BellmanFord (int num_ver) {
+
+ this.num_ver = num_ver;
+
+ D = new int[num_ver + 1];
+
+ }
+
+
+
+ public void BellmanFordEvaluation (int source, int A[][]) {
+
+ for (int node = 1; node <= num_ver; node++)
+
+  D[node] = MAX_VALUE;
+
+
+
+ D[source] = 0;
+
+
+
+ for (int node = 1; node <= num_ver - 1; node++)
+
+  for (int sn = 1; sn <= num_ver; sn++)
+
+  for (int dn = 1; dn <= num_ver; dn++)
+
+   if (A[sn][dn] != MAX_VALUE)
+
+   if (D[dn] > D[sn]+ A[sn][dn])
+
+    D[dn] = D[sn] + A[sn][dn];
+
+
+
+ for (int sn = 1; sn <= num_ver; sn++)
+
+  for (int dn = 1; dn <= num_ver; dn++)
+
+  if (A[sn][dn] != MAX_VALUE)
+
+   if (D[dn] > D[sn]+ A[sn][dn])
+
+   System.out.println ("\nThe Graph contains negative egde cycle");
+
+
+
+ System.out.print ("\n");
+
+ for (int vertex = 1; vertex <= num_ver; vertex++)
+
+  System.out.println ("Distance of source " + source + " to "+ vertex + " is " + D[vertex]);
+
+ }
+
+
+
+ public static void main (String[] args) {
+
+ int num_ver = 0;
+
+ int source;
+
+ Scanner scanner = new Scanner (System.in);
+
+ System.out.print ("Enter the number of vertices : ");
+
+ num_ver = scanner.nextInt ();
+
+ int A[][] = new int[num_ver + 1][num_ver + 1];
+
+ System.out.println ("\nEnter the adjacency matrix");
+
+
+
+ for (int sn = 1; sn <= num_ver; sn++) {
+
+  for (int dn = 1; dn <= num_ver; dn++) {
+
+  A[sn][dn] = scanner.nextInt ();
+
+
+
+  if (sn == dn) {
+
+   A[sn][dn] = 0;
+
+   continue;
+
+  }
+
+
+
+  if (A[sn][dn] == 0)
+
+   A[sn][dn] = MAX_VALUE;
+
+  }
+
+ }
+
+
+
+ System.out.print ("\nEnter the source vertex : ");
+
+ source = scanner.nextInt ();
+
+ BellmanFord b = new BellmanFord (num_ver);
+
+ b.BellmanFordEvaluation (source, A);
+
+ scanner.close ();
+
+ }
+
+}
+
+
+
+Lab 4
+
+import java.util.Scanner;
+
+
+
+class CRC {
+
+ public static void main (String args[]) {
+
+ Scanner sc = new Scanner (System.in);
+
+	
+
+ System.out.print ("Enter data stream : ");
+
+ String datastream = sc.nextLine ();
+
+ System.out.print ("Enter generator : ");
+
+ String generator = sc.nextLine ();
+
+	
+
+ int data[] = new int[datastream.length () + generator.length () - 1];
+
+ int divisor[] = new int[generator.length ()];
+
+
+
+ for (int i = 0; i < datastream.length (); i++)
+
+  data[i] = Integer.parseInt (datastream.charAt (i) + "");
+
+
+
+ for (int i = 0; i < generator.length (); i++)
+
+  divisor[i] = Integer.parseInt (generator.charAt (i) + "");
+
+
+
+ for (int i = 0; i < datastream.length (); i++)
+
+  if (data[i] == 1)
+
+  for (int j = 0; j < divisor.length; j++)
+
+   data[i + j] ^= divisor[j];
+
+
+
+ System.out.print ("The CRC code is : ");
+
+
+
+ for (int i = 0; i < datastream.length (); i++)
+
+  data[i] = Integer.parseInt (datastream.charAt (i) + "");
+
+
+
+ for (int i = 0; i < data.length; i++)
+
+  System.out.print (data[i]);
+
+
+
+ System.out.println ();
+
+ System.out.print ("Enter CRC code : ");
+
+ datastream = sc.nextLine ();
+
+ System.out.print ("Enter generator : ");
+
+ generator = sc.nextLine ();
+
+ data = new int[datastream.length () + generator.length () - 1];
+
+ divisor = new int[generator.length ()];
+
+
+
+ for (int i = 0; i < datastream.length (); i++)
+
+  data[i] = Integer.parseInt (datastream.charAt (i) + "");
+
+
+
+ for (int i = 0; i < generator.length (); i++)
+
+  divisor[i] = Integer.parseInt (generator.charAt (i) + "");
+
+
+
+ for (int i = 0; i < datastream.length (); i++)
+
+  if (data[i] == 1)
+
+  for (int j = 0; j < divisor.length; j++)
+
+   data[i + j] ^= divisor[j];
+
+
+
+ boolean valid = true;
+
+
+
+ for (int i = 0; i < data.length; i++)
+
+  if (data[i] == 1) {
+
+  valid = false;
+
+  break;
+
+  }
+
+
+
+ if (valid == true)
+
+  System.out.println ("Data stream is valid");
+
+ else
+
+  System.out.println ("Data stream is invalid !\nCRC error occured");
+
+ }
+
+}
+
+
+
+Lab 10
+
+import java.util.Scanner;
+
+import java.lang.*;
+
+
+
+public class LeakyBucket {
+
+ public static void main (String[] args) {
+
+ int a[] = new int[20];
+
+ int i, buck_rem = 0, buck_cap = 4, rate = 3, sent, recv;
+
+ Scanner in = new Scanner (System.in);
+
+ System.out.print ("Enter the number of packets : ");
+
+ int n = in.nextInt ();
+
+ System.out.println ("Enter the packets :");
+
+ for (i = 1; i<=n; i++)
+
+  a[i]= in.nextInt ();
+
+ System.out.println ("Clock \t packet size \t accept \t sent \t remaining");
+
+ for (i = 1; i<=n; i++) {
+
+  if (a[i]!=0)
+
+  if (buck_rem+a[i]>buck_cap)
+
+   recv = -1;
+
+  else {
+
+   recv = a[i];
+
+   buck_rem+=a[i];
+
+  }
+
+  else
+
+  recv = 0;
+
+
+
+  if (buck_rem!=0)
+
+  if (buck_rem<rate) {
+
+   sent = buck_rem;
+
+   buck_rem = 0;
+
+  } else {
+
+   sent = rate;
+
+   buck_rem = buck_rem-rate;
+
+  }
+
+  else
+
+  sent = 0;
+
+
+
+  if (recv==-1)
+
+  System.out.println (i + "\t\t" + a[i] + "\t dropped \t" + sent + "\t" + buck_rem);
+
+  else
+
+  System.out.println (i + "\t\t" + a[i] + "\t\t" + recv + "\t" + sent + "\t" + buck_rem);
+
+ }
+
+ }
+
+}
+
+
+
+Lab 9
+
+import java.io.DataInputStream;
+
+import java.io.IOException;
+
+import java.math.BigInteger;
+
+import java.util.Random;
+
+
+
+public class RSA {
+
+ private BigInteger p, q, N, phi, e, d;
+
+ private int bitlength = 1024;
+
+ private Random r;
+
+ public RSA () {
+
+ r = new Random ();
+
+ p = BigInteger.probablePrime (bitlength, r);
+
+ q = BigInteger.probablePrime (bitlength, r);
+
+ System.out.println ("Prime number p is " + p);
+
+ System.out.println ("prime number q is " + q);
+
+ N = p.multiply (q);
+
+ phi = p.subtract (BigInteger.ONE).multiply (q.subtract (BigInteger.ONE));
+
+ e = BigInteger.probablePrime (bitlength / 2, r);
+
+ while (phi.gcd (e).compareTo (BigInteger.ONE) > 0 && e.compareTo (phi) < 0)
+
+  e.add (BigInteger.ONE);
+
+ System.out.println ("Public key is " + e);
+
+ d = e.modInverse (phi);
+
+ System.out.println ("Private key is " + d);
+
+ }
+
+
+
+ public RSA (BigInteger e, BigInteger d, BigInteger N) {
+
+ this.e = e;
+
+ this.d = d;
+
+ this.N = N;
+
+ }
+
+
+
+ public static void main (String[] args)throws IOException {
+
+ RSA rsa = new RSA ();
+
+ DataInputStream in = new DataInputStream (System.in);
+
+ String testString;
+
+ System.out.print ("Enter the plain text : ");
+
+ testString = in.readLine ();
+
+ System.out.println ("Encrypting string : " + testString);
+
+ System.out.println ("string in bytes : " + bytesToString (testString.getBytes ()));
+
+ byte[] encrypted = rsa.encrypt (testString.getBytes ());
+
+ byte[] decrypted = rsa.decrypt (encrypted);
+
+ System.out.println ("Dcrypting Bytes : " + bytesToString (decrypted));
+
+ System.out.println ("Dcrypted string : " + new String (decrypted));
+
+ }
+
+
+
+ private static String bytesToString (byte[] encrypted) {
+
+ String test = " ";
+
+ for (byte b:encrypted)
+
+  test += Byte.toString (b);
+
+ return test;
+
+ }
+
+
+
+ public byte[]encrypt (byte[]message) {
+
+ return (new BigInteger (message)).modPow (e, N).toByteArray ();
+
+ }
+
+
+
+ public byte[]decrypt (byte[]message) {
+
+ return (new BigInteger (message)).modPow (d, N).toByteArray ();
+
+ }
+
+}
+
+import java.util.Scanner;
+
+
+
+public class SlidingWindow {
+
+ public static void main(String[] args) {
+
+ Scanner scanner = new Scanner(System.in);
+
+
+
+ System.out.print("Enter window size : ");
+
+ int w = scanner.nextInt();
+
+ System.out.print("\nEnter number of frames to transmit : ");
+
+ int f = scanner.nextInt();
+
+ int[] frames = new int[f];
+
+ System.out.print("\nEnter " + f + " frames :\n");
+
+
+
+ for (int i = 0; i < f; i++)
+
+  frames[i] = scanner.nextInt();
+
+
+
+ System.out.println (
+
+  "\nWith sliding window protocol the frames will be sent in the following manner " +
+
+  "(assuming no corruption of frames)\n"
+
+ );
+
+
+
+ System.out.printf (
+
+  "After sending %d frames at each stage sender waits for acknowledgement sent by the receiver\n\n", w
+
+ );
+
+  
+
+ for (int i = 0; i < f; i++) {
+
+  System.out.print(frames[i] + " ");
+
+
+
+  if ((i + 1) % w == 0 || (i + 1) == f)
+
+  System.out.printf ("\nAcknowledgement of above frames sent is received by sender\n\n");
+
+ }
+
+ scanner.close();
+
+ }
+
+}
+
+
+
+Lab 7
+
+import java.net.*;
+
+import java.io.*;
+
+
+
+public class TCPClient {
+
+ public static void main (String args[]) throws Exception {
+
+ Socket sock = new Socket ("127.0.0.1", 4000);
+
+ System.out.print ("Enter the file name : ");
+
+ BufferedReader keyRead = new BufferedReader (new InputStreamReader (System.in));
+
+ String fname = keyRead.readLine ();
+
+ OutputStream ostream = sock.getOutputStream ();
+
+ PrintWriter pwrite = new PrintWriter (ostream, true);
+
+ pwrite.println (fname);
+
+ InputStream istream = sock.getInputStream ();
+
+ BufferedReader socketRead = new BufferedReader (new InputStreamReader (istream));
+
+ String str;
+
+
+
+ while ((str = socketRead.readLine ()) != null)
+
+  System.out.println (str);
+
+
+
+ pwrite.close ();
+
+ socketRead.close ();
+
+ keyRead.close ();
+
+ }
+
+}
+
+import java.net.*;
+
+import java.io.*;
+
+
+
+public class TCPServer {
+
+ public static void main (String args[]) throws Exception {
+
+ ServerSocket sersock = new ServerSocket (4000);
+
+ System.out.println ("Server ready for connection");
+
+ Socket sock = sersock.accept ();
+
+ System.out.println ("Connection is successful");
+
+ InputStream istream = sock.getInputStream ();
+
+ BufferedReader fileRead = new BufferedReader (new InputStreamReader (istream));
+
+ String fname = fileRead.readLine ();
+
+ BufferedReader contentRead = new BufferedReader (new FileReader (fname));
+
+ OutputStream ostream = sock.getOutputStream ();
+
+ PrintWriter pwrite = new PrintWriter (ostream, true);
+
+ String str;
+
+
+
+ while ((str = contentRead.readLine ()) != null)
+
+  pwrite.println (str);
+
+
+
+ sock.close ();
+
+ sersock.close ();
+
+ pwrite.close ();
+
+ fileRead.close ();
+
+ contentRead.close ();
+
+ }
+
+}
+
+
+
+Lab 8
+
+import java.io.*;
+
+import java.net.*;
+
+import java.net.InetAddress;
+
+
+
+class UDPClient {
+
+ public static void main (String[] args)throws Exception {
+
+ BufferedReader inFromUser = new BufferedReader (new InputStreamReader (System.in));
+
+ DatagramSocket clientSocket = new DatagramSocket ();
+
+ InetAddress IPAddress = InetAddress.getByName ("localhost");
+
+ byte[] sendData = new byte[1024];
+
+ byte[] receiveData = new byte[1024];
+
+ System.out.println ("Enter the sting to be converted in to Upper case");
+
+ String sentence = inFromUser.readLine ();
+
+ sendData = sentence.getBytes ();
+
+ DatagramPacket sendPacket = new DatagramPacket (sendData, sendData.length, IPAddress, 9876);
+
+ clientSocket.send (sendPacket);
+
+ DatagramPacket receivePacket = new DatagramPacket (receiveData, receiveData.length);
+
+ clientSocket.receive (receivePacket);
+
+ String modifiedSentence = new String (receivePacket.getData ());
+
+ System.out.println ("FROM SERVER:"+modifiedSentence);
+
+ clientSocket.close ();
+
+ }
+
+}
+
+import java.net.*;
+
+import java.net.InetAddress;
+
+
+
+class UDPServer {
+
+ public static void main (String args[])throws Exception {
+
+ DatagramSocket serverSocket = new DatagramSocket (9876);
+
+ byte[] receiveData = new byte[1024];
+
+ byte[] sendData = new byte[1024];
+
+ while (true) {
+
+  System.out.println ("Server is Up");
+
+  DatagramPacket receivePacket = new DatagramPacket (receiveData, receiveData.length);
+
+  serverSocket.receive (receivePacket);
+
+  String sentence = new String (receivePacket.getData ());
+
+  System.out.println ("RECEIVED:" + sentence);
+
+  InetAddress IPAddress = receivePacket.getAddress ();
+
+  int port = receivePacket.getPort ();
+
+  String capitalizedSentence = sentence.toUpperCase ();
+
+  sendData = capitalizedSentence.getBytes ();
+
+  DatagramPacket sendPacket = new DatagramPacket (sendData, sendData.length, IPAddress, port);
+
+  serverSocket.send (sendPacket);
+
+ }
+
+ }
+
+}
